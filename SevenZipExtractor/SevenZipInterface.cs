@@ -4,11 +4,13 @@ using System;
 using System.Globalization;
 using System.IO;
 using System.Runtime.InteropServices;
+using System.Runtime.InteropServices.Marshalling;
 using System.Security.Permissions;
 using System.Threading;
 
 namespace SevenZipExtractor
 {
+    #if !NET9_0_OR_GREATER
     [StructLayout(LayoutKind.Sequential)]
     internal struct PropArray
     {
@@ -19,9 +21,10 @@ namespace SevenZipExtractor
     [StructLayout(LayoutKind.Explicit)]
     internal struct PropVariant
     {
+        /*
         [DllImport("ole32.dll")]
         private static extern int PropVariantClear(ref PropVariant pvar);
-
+*/
         [FieldOffset(0)] public ushort vt;
         [FieldOffset(8)] public IntPtr pointerValue;
         [FieldOffset(8)] public byte byteValue;
@@ -68,7 +71,7 @@ namespace SevenZipExtractor
                     break;
 
                 default:
-                    PropVariantClear(ref this);
+                    //-PropVariantClear(ref this);
                     break;
             }
         }
@@ -97,7 +100,7 @@ namespace SevenZipExtractor
             }
         }
     }
-
+#endif
     [ComImport]
     [Guid("23170F69-40C1-278A-0000-000000050000")]
     [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
@@ -339,10 +342,17 @@ namespace SevenZipExtractor
         //void GetNumberOfItems([In] ref uint numItem);
         uint GetNumberOfItems();
 
+#if NET9_0_OR_GREATER
+        void GetProperty(
+            uint index,
+            ItemPropId propID, // PROPID
+            ref ComVariant value); // PROPVARIANT
+#else
         void GetProperty(
             uint index,
             ItemPropId propID, // PROPID
             ref PropVariant value); // PROPVARIANT
+#endif
 
         [PreserveSig]
         int Extract(
@@ -354,10 +364,17 @@ namespace SevenZipExtractor
         // indices must be sorted 
         // numItems = 0xFFFFFFFF means all files
         // testMode != 0 means "test files operation"
+#if NET9_0_OR_GREATER
+         void GetArchiveProperty(
+            uint propID, // PROPID
+            ref ComVariant value); // PROPVARIANT
 
-        void GetArchiveProperty(
+#else
+         void GetArchiveProperty(
             uint propID, // PROPID
             ref PropVariant value); // PROPVARIANT
+
+#endif
 
         //void GetNumberOfProperties([In] ref uint numProperties);
         uint GetNumberOfProperties();
@@ -399,18 +416,33 @@ namespace SevenZipExtractor
         [MarshalAs(UnmanagedType.Interface)] out object outObject);
 
     [UnmanagedFunctionPointer(CallingConvention.StdCall)]
+    #if NET9_0_OR_GREATER
+    internal delegate int GetHandlerPropertyDelegate(
+        ArchivePropId propID,
+        ref ComVariant value); // PROPVARIANT
+    #else
     internal delegate int GetHandlerPropertyDelegate(
         ArchivePropId propID,
         ref PropVariant value); // PROPVARIANT
-
+    #endif
     [UnmanagedFunctionPointer(CallingConvention.StdCall)]
     internal delegate int GetNumberOfFormatsDelegate(out uint numFormats);
 
     [UnmanagedFunctionPointer(CallingConvention.StdCall)]
+#if NET9_0_OR_GREATER
+    internal delegate int GetHandlerProperty2Delegate(
+        uint formatIndex,
+        ArchivePropId propID,
+        ref ComVariant value); // PROPVARIANT
+    #else
     internal delegate int GetHandlerProperty2Delegate(
         uint formatIndex,
         ArchivePropId propID,
         ref PropVariant value); // PROPVARIANT
+        #endif
+        
+        #if NET9_0_OR_GREATER
+        #endif
 
     internal class StreamWrapper : IDisposable
     {

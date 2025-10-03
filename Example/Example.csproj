@@ -3,7 +3,7 @@
     <OutputType>Exe</OutputType>
     <RootNamespace>ConsoleApplication86</RootNamespace>
     <AssemblyName>ConsoleApplication86</AssemblyName>
-    <TargetFramework>net45</TargetFramework>
+    <TargetFramework>net9.0</TargetFramework>
     <AssemblyTitle>ConsoleApplication86</AssemblyTitle>
     <Product>ConsoleApplication86</Product>
     <Copyright>Copyright © 2016</Copyright>

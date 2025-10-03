@@ -3,6 +3,9 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
+#if NET9_0_OR_GREATER
+using System.Runtime.InteropServices.Marshalling;
+#endif
 
 namespace SevenZipExtractor
 {
@@ -229,6 +232,39 @@ namespace SevenZipExtractor
 
         private T GetProperty<T>(uint fileIndex, ItemPropId name)
         {
+            #if NET9_0_OR_GREATER
+            ComVariant propVariant = new ComVariant();
+            this.archive.GetProperty(fileIndex,name,ref propVariant);
+            object value = propVariant.As<object>();
+
+            if (propVariant.VarType == VarEnum.VT_EMPTY)
+            {
+                propVariant.Dispose();
+                return default(T);
+            }
+
+            propVariant.Dispose();
+
+            if (value == null)
+            {
+                return default(T);
+            }
+
+            Type type = typeof(T);
+            bool isNullable = type.IsGenericType && type.GetGenericTypeDefinition() == typeof(Nullable<>);
+            Type underlyingType = isNullable ? Nullable.GetUnderlyingType(type) : type;
+
+            // This is a hacky code just to work on Lex's machine
+			if (underlyingType == typeof(DateTime))
+			{
+				var dateTimeValue = (DateTime)value;
+				return (T)(object)dateTimeValue;
+			}
+
+			T result = (T)Convert.ChangeType(value.ToString(), underlyingType);
+
+            return result;
+            #else
             PropVariant propVariant = new PropVariant();
             this.archive.GetProperty(fileIndex, name, ref propVariant);
             object value = propVariant.GetObject();
@@ -260,6 +296,7 @@ namespace SevenZipExtractor
 			T result = (T)Convert.ChangeType(value.ToString(), underlyingType);
 
             return result;
+            #endif
         }
 
         private void InitializeAndValidateLibrary()
@@ -267,27 +304,48 @@ namespace SevenZipExtractor
             if (string.IsNullOrWhiteSpace(this.libraryFilePath))
             {
                 string currentArchitecture = IntPtr.Size == 4 ? "x86" : "x64"; // magic check
-
-                if (File.Exists(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "7z-" + currentArchitecture + ".dll")))
+                if(RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
                 {
-                    this.libraryFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "7z-" + currentArchitecture + ".dll");
-                }
-                else if (File.Exists(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "bin", "7z-" + currentArchitecture + ".dll")))
+                    if (File.Exists(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "7z-" + currentArchitecture + ".dll")))
+                    {
+                        this.libraryFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "7z-" + currentArchitecture + ".dll");
+                    }
+                    else if (File.Exists(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "bin", "7z-" + currentArchitecture + ".dll")))
+                    {
+                        this.libraryFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "bin", "7z-" + currentArchitecture + ".dll");
+                    }
+                    else if (File.Exists(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "bin", currentArchitecture, "7z.dll")))
+                    {
+                        this.libraryFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "bin", currentArchitecture, "7z.dll");
+                    }
+                    else if (File.Exists(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, currentArchitecture, "7z.dll")))
+                    {
+                        this.libraryFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, currentArchitecture, "7z.dll");
+                    }
+                    else if (File.Exists(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "7-Zip", "7z.dll")))
+                    {
+                        this.libraryFilePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "7-Zip", "7z.dll");
+                    }
+                } else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
                 {
-                    this.libraryFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "bin", "7z-" + currentArchitecture + ".dll");
+                    if (File.Exists(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "7z-" + currentArchitecture + ".so")))
+                    {
+                        this.libraryFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "7z-" + currentArchitecture + ".so");
+                    }
+                    else if (File.Exists(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "bin", "7z-" + currentArchitecture + ".so")))
+                    {
+                        this.libraryFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "bin", "7z-" + currentArchitecture + ".so");
+                    }
+                    else if (File.Exists(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "bin", currentArchitecture, "7z.so")))
+                    {
+                        this.libraryFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "bin", currentArchitecture, "7z.so");
+                    }
+                    else if (File.Exists(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, currentArchitecture, "7z.so")))
+                    {
+                        this.libraryFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, currentArchitecture, "7z.so");
+                    }
                 }
-                else if (File.Exists(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "bin", currentArchitecture, "7z.dll")))
-                {
-                    this.libraryFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "bin", currentArchitecture, "7z.dll");
-                }
-                else if (File.Exists(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, currentArchitecture, "7z.dll")))
-                {
-                    this.libraryFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, currentArchitecture, "7z.dll");
-                }
-                else if (File.Exists(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "7-Zip", "7z.dll")))
-                {
-                    this.libraryFilePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "7-Zip", "7z.dll");
-                }
+                
             }
 
             if (string.IsNullOrWhiteSpace(this.libraryFilePath))
@@ -390,12 +448,17 @@ namespace SevenZipExtractor
             {
                 this.archiveStream.Dispose();
             }
-
+#if !NET9_0_OR_GREATER
             if (this.archive != null)
             {
                 Marshal.ReleaseComObject(this.archive);
             }
-
+#else
+            if (this.archive != null)
+            {
+                //this.archive.;
+            }
+#endif
             if (this.sevenZipHandle != null)
             {
                 this.sevenZipHandle.Dispose();

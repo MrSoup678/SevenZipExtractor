@@ -1,6 +1,6 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFrameworks>net45;netstandard2.0</TargetFrameworks>
+    <TargetFrameworks>net9.0</TargetFrameworks>
     <AssemblyTitle>SevenZipWrapper</AssemblyTitle>
     <Product>SevenZipWrapper</Product>
     <Description>C# wrapper for 7z.dll (included)</Description>
@@ -16,6 +16,12 @@
 
   <ItemGroup>
     <None Include="$(MSBuildThisFileDirectory)x64\7z.dll">
+      <PackagePath>build\x64\</PackagePath>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+
+      <Pack>true</Pack>
+    </None>
+    <None Include="$(MSBuildThisFileDirectory)x64\7z.so">
       <PackagePath>build\x64\</PackagePath>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 
