@@ -20,7 +20,8 @@ namespace SevenZipExtractor
             {
                 NativeLibrary.Free(this.sevenZipSafeHandle);
                 throw new ArgumentException();
-            };
+            }
+            ;
         }
 
         ~SevenZipHandle()
@@ -57,10 +58,16 @@ namespace SevenZipExtractor
             NativeLibrary.TryGetExport(sevenZipSafeHandle, "CreateObject", out procAddress);
             CreateObjectDelegate createObject = (CreateObjectDelegate)Marshal.GetDelegateForFunctionPointer(procAddress, typeof(CreateObjectDelegate));
             object result;
-            Guid interfaceId = typeof (IInArchive).GUID;
-            createObject(ref classId, ref interfaceId, out result);
-
+            Guid interfaceId = typeof(IInArchive).GUID;
+            //createObject(ref classId, ref interfaceId, out result);
+            unsafe
+            {
+                createObject(&classId, &interfaceId, &result);
+            }
+            
             return result as IInArchive;
         }
     }
+    
+
 }

@@ -112,17 +112,17 @@ namespace SevenZipExtractor
 
     [GeneratedComInterface(Options = ComInterfaceOptions.ManagedObjectWrapper)]
     [Guid("23170F69-40C1-278A-0000-000600100000")]
-    internal partial interface IArchiveOpenCallback
+    internal unsafe partial interface IArchiveOpenCallback
     {
         // ref ulong replaced with IntPtr because handlers ofter pass null value
         // read actual value with Marshal.ReadInt64
         void SetTotal(
-            IntPtr files, // [In] ref ulong files, can use 'ulong* files' but it is unsafe
-            IntPtr bytes); // [In] ref ulong bytes
+            ulong* files, // [In] ref ulong files, can use 'ulong* files' but it is unsafe
+            ulong* bytes); // [In] ref ulong bytes
 
         void SetCompleted(
-            IntPtr files, // [In] ref ulong files
-            IntPtr bytes); // [In] ref ulong bytes
+            ulong* files, // [In] ref ulong files
+            ulong* bytes); // [In] ref ulong bytes
     }
 
     [GeneratedComInterface(Options = ComInterfaceOptions.ManagedObjectWrapper)]
@@ -232,7 +232,7 @@ namespace SevenZipExtractor
 
     [GeneratedComInterface(Options = ComInterfaceOptions.ManagedObjectWrapper)]
     [Guid("23170F69-40C1-278A-0000-000300030000")]
-    internal partial interface IInStream //: ISequentialInStream
+    internal unsafe partial interface IInStream //: ISequentialInStream
     {
         //[PreserveSig]
         //int Read(
@@ -248,12 +248,12 @@ namespace SevenZipExtractor
         void Seek(
             long offset,
             uint seekOrigin,
-            IntPtr newPosition); // ref long newPosition
+            long* newPosition); // ref long newPosition
     }
 
     [GeneratedComInterface(Options = ComInterfaceOptions.ManagedObjectWrapper)]
     [Guid("23170F69-40C1-278A-0000-000300040000")]
-    internal partial interface IOutStream //: ISequentialOutStream
+    internal unsafe partial interface IOutStream //: ISequentialOutStream
     {
         [PreserveSig]
         int Write(
@@ -265,7 +265,7 @@ namespace SevenZipExtractor
         void Seek(
             long offset,
             uint seekOrigin,
-            IntPtr newPosition); // ref long newPosition
+            long* newPosition); // ref long newPosition
 
         [PreserveSig]
         int SetSize(long newSize);
@@ -401,24 +401,24 @@ namespace SevenZipExtractor
     }
 
     [UnmanagedFunctionPointer(CallingConvention.StdCall)]
-    internal delegate int CreateObjectDelegate(
-        [In] ref Guid classID,
-        [In] ref Guid interfaceID,
+    internal unsafe delegate int CreateObjectDelegate(
+         Guid* classID,
+         Guid* interfaceID,
         //out IntPtr outObject);
-        [MarshalAs(UnmanagedType.Interface)] out object outObject);
+        [MarshalAs(UnmanagedType.Interface)] object* outObject);
 
     [UnmanagedFunctionPointer(CallingConvention.StdCall)]
     #if NET9_0_OR_GREATER
     internal delegate int GetHandlerPropertyDelegate(
         ArchivePropId propID,
-        ref ComVariant value); // PROPVARIANT
+        ComVariant value); // PROPVARIANT
     #else
     internal delegate int GetHandlerPropertyDelegate(
         ArchivePropId propID,
         ref PropVariant value); // PROPVARIANT
     #endif
     [UnmanagedFunctionPointer(CallingConvention.StdCall)]
-    internal delegate int GetNumberOfFormatsDelegate(out uint numFormats);
+    internal unsafe delegate int GetNumberOfFormatsDelegate( uint* numFormats);
 
     [UnmanagedFunctionPointer(CallingConvention.StdCall)]
 #if NET9_0_OR_GREATER
@@ -463,7 +463,7 @@ namespace SevenZipExtractor
 
 
     [GeneratedComClass]
-    internal partial class InStreamWrapper : StreamWrapper, ISequentialInStream, IInStream
+    internal unsafe partial class InStreamWrapper : StreamWrapper, ISequentialInStream, IInStream
     {
         public InStreamWrapper(Stream baseStream) : base(baseStream)
         {
@@ -473,10 +473,18 @@ namespace SevenZipExtractor
         {
             return (uint) this.BaseStream.Read(data, 0, (int) size);
         }
+        public virtual void Seek(long offset, uint seekOrigin, long* newPosition)
+        {
+            long pos = BaseStream.Seek(offset, (SeekOrigin)seekOrigin);
+            if (newPosition != null)
+            {
+                *newPosition = pos;
+            }
+        }
     }
 
     [GeneratedComClass]
-    internal partial class OutStreamWrapper : StreamWrapper, ISequentialOutStream, IOutStream
+    internal unsafe partial class OutStreamWrapper : StreamWrapper, ISequentialOutStream, IOutStream
     {
         public OutStreamWrapper(Stream baseStream) : base(baseStream)
         {
@@ -498,6 +506,14 @@ namespace SevenZipExtractor
             }
 
             return 0;
+        }
+        public virtual void Seek(long offset, uint seekOrigin, long* newPosition)
+        {
+            long pos = BaseStream.Seek(offset, (SeekOrigin)seekOrigin);
+            if (newPosition != null)
+            {
+                *newPosition = pos;
+            }
         }
     }
 }

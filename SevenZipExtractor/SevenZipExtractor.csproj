@@ -15,12 +15,11 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
 
-<!--
+
   <ItemGroup>
     <AssemblyAttribute Include="System.Runtime.CompilerServices.DisableRuntimeMarshallingAttribute" />
   </ItemGroup>
-  
--->
+
   <ItemGroup>
     <None Include="$(MSBuildThisFileDirectory)x64\7z.dll">
       <PackagePath>build\x64\</PackagePath>
