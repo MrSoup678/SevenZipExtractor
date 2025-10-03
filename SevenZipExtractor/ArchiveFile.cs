@@ -1,410 +1,437 @@
+﻿using SevenZipExtractor.Enum;
+using SevenZipExtractor.Event;
+using SevenZipExtractor.Format;
+using SevenZipExtractor.Interface;
+using SevenZipExtractor.IO.Callback;
+using SevenZipExtractor.IO.Wrapper;
+using SevenZipExtractor.Unmanaged;
 using System;
+using System.Buffers;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Runtime.InteropServices;
+using System.Threading;
+using System.Threading.Tasks;
+// ReSharper disable ForeachCanBePartlyConvertedToQueryUsingAnotherGetEnumerator
+// ReSharper disable LoopCanBeConvertedToQuery
+// ReSharper disable UnusedMember.Global
 
 namespace SevenZipExtractor
 {
-    public class ArchiveFile : IDisposable
+    /// <summary>
+    /// Instance of the Archive file.
+    /// </summary>
+    public sealed class ArchiveFile : IDisposable
     {
-        private SevenZipHandle sevenZipHandle;
-        private readonly IInArchive archive;
-        private readonly InStreamWrapper archiveStream;
-        private IList<Entry> entries;
+        private const    int             DefaultOutBufferSize = 4 << 10;
 
-        private string libraryFilePath;
+        private readonly IInArchive?     _archive;
+        private readonly Stream          _archiveStream;
+        private readonly bool            _disposeArchiveStream;
+        private          ulong           _lastSize;
+        private          Stopwatch       _extractProgressStopwatch = Stopwatch.StartNew();
 
-        public SevenZipFormat Format { get; private set; }
+        internal         string?         ArchivePassword;
 
-        public ArchiveFile(string archiveFilePath, string libraryFilePath = null)
+        /// <summary>
+        /// Occurs when the extraction progress changes.
+        /// </summary>
+        public event EventHandler<ExtractProgressProp>? ExtractProgress;
+
+        /// <summary>
+        /// Gets the list of entries in the archive.
+        /// </summary>
+        public List<Entry> Entries { get; }
+
+        /// <summary>
+        /// Gets the count of files in the archive.
+        /// </summary>
+        public int Count { get; }
+
+        /// <summary>
+        /// Gets the count of files and folders in the archive.
+        /// </summary>
+        public int CountWithFolders { get; }
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="ArchiveFile"/> class from the specified archive file path.
+        /// </summary>
+        /// <param name="archiveFilePath">The path to the archive file.</param>
+        public ArchiveFile(string archiveFilePath) :
+            this(File.Open(archiveFilePath, FileMode.Open, FileAccess.Read, FileShare.Read), true)
+        { }
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="ArchiveFile"/> class from the specified archive stream and format.
+        /// </summary>
+        /// <param name="archiveStream">The stream of the archive file.</param>
+        /// <param name="format">The format of the archive file. Default is <see cref="SevenZipFormat.Undefined"/> for automatic detection.</param>
+        public ArchiveFile(Stream archiveStream, SevenZipFormat format = SevenZipFormat.Undefined) :
+            this(archiveStream, true, format)
+        { }
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="ArchiveFile"/> class from the specified archive stream and format.
+        /// </summary>
+        /// <param name="archiveStream">The stream of the archive file.</param>
+        /// <param name="disposeStream">Dispose the archive stream after being used.</param>
+        /// <param name="format">The format of the archive file. Default is <see cref="SevenZipFormat.Undefined"/> for automatic detection.</param>
+        public ArchiveFile(Stream archiveStream, bool disposeStream, SevenZipFormat format = SevenZipFormat.Undefined)
         {
-            this.libraryFilePath = libraryFilePath;
+            ArgumentNullException.ThrowIfNull(archiveStream, nameof(archiveStream));
 
-            this.InitializeAndValidateLibrary();
-
-            if (!File.Exists(archiveFilePath))
+            if (format == SevenZipFormat.Undefined)
             {
-                throw new SevenZipException("Archive file not found");
+                if (!archiveStream.CanSeek)
+                {
+                    throw new InvalidOperationException("Cannot guess the format due to archiveStream is not seekable");
+                }
+
+                if (!GuessFormatFromSignature(archiveStream, out format))
+                {
+                    throw new FormatException("Unable to guess the format automatically");
+                }
             }
 
-            SevenZipFormat format;
+            _archiveStream = archiveStream;
+            InStreamWrapper streamWrapper = new(_archiveStream, CancellationToken.None);
 
-            string extension = Path.GetExtension(archiveFilePath);
-
-            if (this.GuessFormatFromExtension(extension, out format))
-            {
-                // great
-            }
-            else if (this.GuessFormatFromSignature(archiveFilePath, out format))
-            {
-                // success
-            }
-            else
-            {
-                throw new SevenZipException(Path.GetFileName(archiveFilePath) + " is not a known archive type");
-            }
-
-            this.Format = format;
-
-            this.archive = this.sevenZipHandle.CreateInArchive(Formats.FormatGuidMapping[format]);
-            this.archiveStream = new InStreamWrapper(File.OpenRead(archiveFilePath));
+            _archive              = NativeMethods.CreateInArchiveClassId(FormatIdentity.GuidMapping[format]);
+            _disposeArchiveStream = disposeStream;
+            Entries               = GetEntriesInner(_archive, streamWrapper, this);
+            CountWithFolders      = Entries.Count;
+            Count                 = Entries.Sum(x => x.IsFolder ? 0 : 1);
         }
 
-        public ArchiveFile(Stream archiveStream, SevenZipFormat? format = null, string libraryFilePath = null)
+        ~ArchiveFile() => Dispose();
+
+        /// <summary>
+        /// Set the password to be used to extract the archive.<br/>
+        /// Set it to <c>null</c> or <see cref="string.Empty"/> to reset the password.
+        /// </summary>
+        public void SetArchivePassword(string? password)
+            => ArchivePassword = password;
+
+        /// <summary>
+        /// Creates an instance of <see cref="ArchiveFile"/> from the specified archive file path.
+        /// </summary>
+        /// <param name="archiveFilePath">The path to the archive file.</param>
+        /// <returns>A new instance of <see cref="ArchiveFile"/>.</returns>
+        public static ArchiveFile Create(string archiveFilePath)
+            => new(archiveFilePath);
+
+        /// <summary>
+        /// Creates an instance of <see cref="ArchiveFile"/> from the specified archive stream and format.
+        /// </summary>
+        /// <param name="archiveStream">The stream of the archive file.</param>
+        /// <param name="format">The format of the archive file. Default is <see cref="SevenZipFormat.Undefined"/> for automatic detection.</param>
+        /// <returns>A new instance of <see cref="ArchiveFile"/>.</returns>
+        public static ArchiveFile Create(Stream archiveStream, SevenZipFormat format = SevenZipFormat.Undefined)
+            => new(archiveStream, true, format);
+
+        /// <summary>
+        /// Creates an instance of <see cref="ArchiveFile"/> from the specified archive stream and format.
+        /// </summary>
+        /// <param name="archiveStream">The stream of the archive file.</param>
+        /// <param name="disposeStream">Dispose the archive stream after being used.</param>
+        /// <param name="format">The format of the archive file. Default is <see cref="SevenZipFormat.Undefined"/> for automatic detection.</param>
+        /// <returns>A new instance of <see cref="ArchiveFile"/>.</returns>
+        public static ArchiveFile Create(Stream archiveStream, bool disposeStream, SevenZipFormat format = SevenZipFormat.Undefined)
+            => new(archiveStream, disposeStream, format);
+
+        /// <summary>
+        /// Extract all contents inside the <see cref="ArchiveFile"/> to the specified output folder.
+        /// </summary>
+        /// <param name="outputFolder">The folder where the files will be extracted.</param>
+        /// <param name="overwrite">Indicates whether to overwrite existing files.</param>
+        /// <param name="token">A cancellation token to observe while waiting for the task to complete.</param>
+        public void Extract(string outputFolder, bool overwrite = true, CancellationToken token = default)
+            => Extract(entry => GetEntryPathInner(entry, outputFolder), overwrite, true, DefaultOutBufferSize, token);
+
+        /// <summary>
+        /// Extract all contents inside the <see cref="ArchiveFile"/> to the specified output folder.
+        /// </summary>
+        /// <param name="outputFolder">The folder where the files will be extracted.</param>
+        /// <param name="overwrite">Indicates whether to overwrite existing files.</param>
+        /// <param name="outputBufferSize">The size of the output buffer.</param>
+        /// <param name="token">A cancellation token to observe while waiting for the task to complete.</param>
+        public void Extract(string outputFolder, bool overwrite, int outputBufferSize, CancellationToken token = default)
+            => Extract(entry => GetEntryPathInner(entry, outputFolder), overwrite, true, outputBufferSize, token);
+
+        /// <summary>
+        /// Extract all contents inside the <see cref="ArchiveFile"/> to the specified output folder.
+        /// </summary>
+        /// <param name="outputFolder">The folder where the files will be extracted.</param>
+        /// <param name="overwrite">Indicates whether to overwrite existing files.</param>
+        /// <param name="preserveTimestamp">Indicates whether to preserve the original timestamps of the files.</param>
+        /// <param name="outputBufferSize">The size of the output buffer.</param>
+        /// <param name="token">A cancellation token to observe while waiting for the task to complete.</param>
+        public void Extract(string outputFolder, bool overwrite, bool preserveTimestamp, int outputBufferSize, CancellationToken token = default)
+            => Extract(entry => GetEntryPathInner(entry, outputFolder), overwrite, preserveTimestamp, outputBufferSize, token);
+
+        /// <summary>
+        /// Extract all contents inside the <see cref="ArchiveFile"/> to the specified output folder.
+        /// </summary>
+        /// <param name="getOutputPath">Delegates to set the output of the given file to be extracted.</param>
+        /// <param name="token">A cancellation token to observe while waiting for the task to complete.</param>
+        public void Extract(Func<Entry, string?> getOutputPath, CancellationToken token = default)
+            => Extract(getOutputPath, true, true, DefaultOutBufferSize, token);
+
+        /// <summary>
+        /// Extract all contents inside the <see cref="ArchiveFile"/> to the specified output folder.
+        /// </summary>
+        /// <param name="getOutputPath">Delegates to set the output of the given file to be extracted.</param>
+        /// <param name="overwrite">Indicates whether to overwrite existing files.</param>
+        /// <param name="token">A cancellation token to observe while waiting for the task to complete.</param>
+        public void Extract(Func<Entry, string?> getOutputPath, bool overwrite, CancellationToken token = default)
+            => Extract(getOutputPath, overwrite, true, DefaultOutBufferSize, token);
+
+        /// <summary>
+        /// Extract all contents inside the <see cref="ArchiveFile"/> to the specified output folder.
+        /// </summary>
+        /// <param name="getOutputPath">Delegates to set the output of the given file to be extracted.</param>
+        /// <param name="overwrite">Indicates whether to overwrite existing files.</param>
+        /// <param name="preserveTimestamp">Indicates whether to preserve the original timestamps of the files.</param>
+        /// <param name="token">A cancellation token to observe while waiting for the task to complete.</param>
+        public void Extract(Func<Entry, string?> getOutputPath, bool overwrite, bool preserveTimestamp = true, CancellationToken token = default)
+            => Extract(getOutputPath, overwrite, preserveTimestamp, DefaultOutBufferSize, token);
+
+        /// <summary>
+        /// Extract all contents inside the <see cref="ArchiveFile"/> to the specified output folder.
+        /// </summary>
+        /// <param name="getOutputPath">Delegates to set the output of the given file to be extracted.</param>
+        /// <param name="overwrite">Indicates whether to overwrite existing files.</param>
+        /// <param name="preserveTimestamp">Indicates whether to preserve the original timestamps of the files.</param>
+        /// <param name="outputBufferSize">The size of the output buffer.</param>
+        /// <param name="token">A cancellation token to observe while waiting for the task to complete.</param>
+        public void Extract(Func<Entry, string?> getOutputPath, bool overwrite, bool preserveTimestamp, int outputBufferSize, CancellationToken token = default)
         {
-            this.libraryFilePath = libraryFilePath;
-
-            this.InitializeAndValidateLibrary();
-
-            if (archiveStream == null)
-            {
-                throw new SevenZipException("archiveStream is null");
-            }
-
-            if (format == null)
-            {
-                SevenZipFormat guessedFormat;
-
-                if (this.GuessFormatFromSignature(archiveStream, out guessedFormat))
-                {
-                    format = guessedFormat;
-                }
-                else
-                {
-                    throw new SevenZipException("Unable to guess format automatically");
-                }
-            }
-
-            this.Format = format.Value;
-
-            this.archive = this.sevenZipHandle.CreateInArchive(Formats.FormatGuidMapping[format.Value]);
-            this.archiveStream = new InStreamWrapper(archiveStream);
-        }
-
-
-        public void Extract(string outputFolder, bool overwrite = false, string password = null)
-        {
-            this.Extract(entry =>
-            {
-                string fileName = Path.Combine(outputFolder, entry.FileName);
-
-                if (entry.IsFolder)
-                {
-                    return fileName;
-                }
-
-                if (!File.Exists(fileName) || overwrite)
-                {
-                    return fileName;
-                }
-
-                return null;
-            },
-            password);
-        }
-
-        public void Extract(Func<Entry, string> getOutputPath, string password = null)
-        {
-            IList<Stream> fileStreams = new List<Stream>();
+            ArchiveStreamsCallback? streamCallback = null;
+            outputBufferSize = Math.Max(DefaultOutBufferSize, outputBufferSize);
 
             try
             {
-                foreach (Entry entry in this.Entries)
-                {
-                    string outputPath = getOutputPath(entry);
+                streamCallback = ArchiveStreamsCallback.Create(getOutputPath, Entries, overwrite, preserveTimestamp, outputBufferSize, token);
+                streamCallback.ReadProgress += StreamCallback_ReadProperty;
+                streamCallback.SetArchivePassword(ArchivePassword);
 
-                    if (outputPath == null) // getOutputPath = null means SKIP
-                    {
-                        fileStreams.Add(null);
-                        continue;
-                    }
-
-                    if (entry.IsFolder)
-                    {
-                        Directory.CreateDirectory(outputPath);
-                        fileStreams.Add(null);
-                        continue;
-                    }
-
-                    string directoryName = Path.GetDirectoryName(outputPath);
-
-                    if (!string.IsNullOrWhiteSpace(directoryName))
-                    {
-                        Directory.CreateDirectory(directoryName);
-                    }
-
-                    fileStreams.Add(File.Create(outputPath));
-                }
-
-                this.archive.Extract(null, 0xFFFFFFFF, 0, new ArchiveStreamsCallback(fileStreams, password));
+                _lastSize                 = 0;
+                _extractProgressStopwatch = Stopwatch.StartNew();
+                _archive?.Extract(0, 0xFFFFFFFF, 0, streamCallback);
             }
             finally
             {
-                foreach (Stream stream in fileStreams)
+                _extractProgressStopwatch.Stop();
+                if (streamCallback != null)
                 {
-                    if (stream != null)
+                    streamCallback.ReadProgress -= StreamCallback_ReadProperty;
+                    streamCallback.Dispose();
+                }
+            }
+        }
+
+        /// <summary>
+        /// Extract all contents inside the <see cref="ArchiveFile"/> to the specified output folder asynchronously.
+        /// </summary>
+        /// <param name="outputFolder">The folder where the files will be extracted.</param>
+        /// <param name="overwrite">Indicates whether to overwrite existing files.</param>
+        /// <param name="token">A cancellation token to observe while waiting for the task to complete.</param>
+        /// <returns>A task that represents the asynchronous extraction operation.</returns>
+        public Task ExtractAsync(string outputFolder, bool overwrite = true, CancellationToken token = default)
+            => ExtractAsync(entry => GetEntryPathInner(entry, outputFolder), overwrite, true, DefaultOutBufferSize, token);
+
+        /// <summary>
+        /// Extract all contents inside the <see cref="ArchiveFile"/> to the specified output folder asynchronously.
+        /// </summary>
+        /// <param name="outputFolder">The folder where the files will be extracted.</param>
+        /// <param name="overwrite">Indicates whether to overwrite existing files.</param>
+        /// <param name="outputBufferSize">The size of the output buffer.</param>
+        /// <param name="token">A cancellation token to observe while waiting for the task to complete.</param>
+        /// <returns>A task that represents the asynchronous extraction operation.</returns>
+        public Task ExtractAsync(string outputFolder, bool overwrite, int outputBufferSize, CancellationToken token = default)
+            => ExtractAsync(entry => GetEntryPathInner(entry, outputFolder), overwrite, true, outputBufferSize, token);
+
+        /// <summary>
+        /// Extract all contents inside the <see cref="ArchiveFile"/> to the specified output folder asynchronously.
+        /// </summary>
+        /// <param name="outputFolder">The folder where the files will be extracted.</param>
+        /// <param name="overwrite">Indicates whether to overwrite existing files.</param>
+        /// <param name="preserveTimestamp">Indicates whether to preserve the original timestamps of the files.</param>
+        /// <param name="outputBufferSize">The size of the output buffer.</param>
+        /// <param name="token">A cancellation token to observe while waiting for the task to complete.</param>
+        /// <returns>A task that represents the asynchronous extraction operation.</returns>
+        public Task ExtractAsync(string outputFolder, bool overwrite, bool preserveTimestamp, int outputBufferSize, CancellationToken token = default)
+            => ExtractAsync(entry => GetEntryPathInner(entry, outputFolder), overwrite, preserveTimestamp, outputBufferSize, token);
+
+        /// <summary>
+        /// Extract all contents inside the <see cref="ArchiveFile"/> to the specified output folder asynchronously.
+        /// </summary>
+        /// <param name="getOutputPath">Delegates to set the output of the given file to be extracted.</param>
+        /// <param name="token">A cancellation token to observe while waiting for the task to complete.</param>
+        /// <returns>A task that represents the asynchronous extraction operation.</returns>
+        public Task ExtractAsync(Func<Entry, string?> getOutputPath, CancellationToken token = default)
+            => ExtractAsync(getOutputPath, true, true, DefaultOutBufferSize, token);
+
+        /// <summary>
+        /// Extract all contents inside the <see cref="ArchiveFile"/> to the specified output folder asynchronously.
+        /// </summary>
+        /// <param name="getOutputPath">Delegates to set the output of the given file to be extracted.</param>
+        /// <param name="overwrite">Indicates whether to overwrite existing files.</param>
+        /// <param name="token">A cancellation token to observe while waiting for the task to complete.</param>
+        /// <returns>A task that represents the asynchronous extraction operation.</returns>
+        public Task ExtractAsync(Func<Entry, string?> getOutputPath, bool overwrite, CancellationToken token = default)
+            => ExtractAsync(getOutputPath, overwrite, true, DefaultOutBufferSize, token);
+
+        /// <summary>
+        /// Extract all contents inside the <see cref="ArchiveFile"/> to the specified output folder asynchronously.
+        /// </summary>
+        /// <param name="getOutputPath">Delegates to set the output of the given file to be extracted.</param>
+        /// <param name="overwrite">Indicates whether to overwrite existing files.</param>
+        /// <param name="outputBufferSize">The size of the output buffer.</param>
+        /// <param name="token">A cancellation token to observe while waiting for the task to complete.</param>
+        /// <returns>A task that represents the asynchronous extraction operation.</returns>
+        public Task ExtractAsync(Func<Entry, string?> getOutputPath, bool overwrite, int outputBufferSize, CancellationToken token = default)
+            => ExtractAsync(getOutputPath, overwrite, true, outputBufferSize, token);
+
+        /// <summary>
+        /// Extract all contents inside the <see cref="ArchiveFile"/> to the specified output folder asynchronously.
+        /// </summary>
+        /// <param name="getOutputPath">Delegates to set the output of the given file to be extracted.</param>
+        /// <param name="overwrite">Indicates whether to overwrite existing files.</param>
+        /// <param name="preserveTimestamp">Indicates whether to preserve the original timestamps of the files.</param>
+        /// <param name="outputBufferSize">The size of the output buffer.</param>
+        /// <param name="token">A cancellation token to observe while waiting for the task to complete.</param>
+        /// <returns>A task that represents the asynchronous extraction operation.</returns>
+        public Task ExtractAsync(Func<Entry, string?> getOutputPath, bool overwrite, bool preserveTimestamp, int outputBufferSize, CancellationToken token = default)
+            => Task.Factory.StartNew(
+                () => Extract(getOutputPath, overwrite, preserveTimestamp, outputBufferSize, token),
+                token,
+                TaskCreationOptions.LongRunning,
+                TaskScheduler.Default);
+
+        private static string GetEntryPathInner(Entry entry, string outputFolder)
+            => Path.Combine(outputFolder, entry.FileName ?? string.Empty);
+
+        private static List<Entry> GetEntriesInner(IInArchive? archive, IInStream archiveStream, ArchiveFile parent)
+        {
+            if (archive == null)
+            {
+                throw new InvalidOperationException("Archive is not initialized");
+            }
+
+            List<Entry> entries  = [];
+            const ulong checkPos = 32 * 1024;
+            archive.Open(archiveStream, checkPos, null);
+
+            archive.GetNumberOfItems(out uint itemsCount);
+            for (uint index = 0; index < itemsCount; index++)
+            {
+                entries.Add(Entry.Create(archive, index, parent));
+            }
+
+            return entries;
+        }
+
+        private ulong GetLastSize(ulong input)
+        {
+            if (_lastSize > input)
+            {
+                _lastSize = input;
+            }
+
+            ulong a = input - _lastSize;
+            _lastSize = input;
+            return a;
+        }
+
+        private void UpdateProgress(ExtractProgressProp e)
+            => ExtractProgress?.Invoke(this, e);
+
+        private void StreamCallback_ReadProperty(object? sender, FileProgressProperty e)
+            => UpdateProgress(new ExtractProgressProp(GetLastSize(e.StartRead),
+                                                   e.StartRead, e.EndRead,
+                                                   _extractProgressStopwatch.Elapsed.TotalSeconds, e.Count,
+                                                   Count));
+
+        private static int SearchMaxSignatureLength()
+            => FormatIdentity.Signatures.Values.Select(GetSignatureLength).Prepend(0).Max();
+
+        private static int GetSignatureLength(FormatProperties format)
+        {
+            int len = 0;
+            len += format.SignatureOffsets.Max();
+            len += format.SignatureData.Length;
+            return len;
+        }
+
+        private static bool GuessFormatFromSignature(Stream stream, out SevenZipFormat format)
+        {
+            int maxLenSignature = SearchMaxSignatureLength();
+            format = SevenZipFormat.Undefined;
+
+            if (!stream.CanSeek)
+            {
+                throw new InvalidOperationException("Stream must be seekable to detect the format properly!");
+            }
+
+            if (maxLenSignature > stream.Length)
+            {
+                maxLenSignature = (int)stream.Length;
+            }
+
+            byte[] archiveFileSignature = ArrayPool<byte>.Shared.Rent(maxLenSignature);
+            try
+            {
+                int bytesRead = stream.ReadAtLeast(archiveFileSignature.AsSpan(0, maxLenSignature), maxLenSignature, false);
+                stream.Position -= bytesRead;
+
+                if (bytesRead != maxLenSignature)
+                {
+                    return false;
+                }
+
+                foreach (KeyValuePair<SevenZipFormat, FormatProperties> pair in FormatIdentity.Signatures)
+                {
+                    int[] offsets = pair.Value.SignatureOffsets;
+                    foreach (int offset in offsets)
                     {
-                        stream.Dispose();
+                        if (maxLenSignature < offset + pair.Value.SignatureData.Length)
+                        {
+                            continue;
+                        }
+
+                        if (!archiveFileSignature.AsSpan(offset, pair.Value.SignatureData.Length)
+                                                 .SequenceEqual(pair.Value.SignatureData))
+                        {
+                            continue;
+                        }
+
+                        format = pair.Key;
+                        return true;
                     }
                 }
-            }
-        }
-
-        public IList<Entry> Entries
-        {
-            get
-            {
-                if (this.entries != null)
-                {
-                    return this.entries;
-                }
-
-                ulong checkPos = 32 * 1024;
-                int open = this.archive.Open(this.archiveStream, ref checkPos, null);
-
-                if (open != 0)
-                {
-                    throw new SevenZipException("Unable to open archive");
-                }
-
-                uint itemsCount = this.archive.GetNumberOfItems();
-
-                this.entries = new List<Entry>();
-
-                for (uint fileIndex = 0; fileIndex < itemsCount; fileIndex++)
-                {
-                    string fileName = this.GetProperty<string>(fileIndex, ItemPropId.kpidPath);
-                    bool isFolder = this.GetProperty<bool>(fileIndex, ItemPropId.kpidIsFolder);
-                    bool isEncrypted = this.GetProperty<bool>(fileIndex, ItemPropId.kpidEncrypted);
-                    ulong size = this.GetProperty<ulong>(fileIndex, ItemPropId.kpidSize);
-                    ulong packedSize = this.GetProperty<ulong>(fileIndex, ItemPropId.kpidPackedSize);
-                    DateTime creationTime = this.GetPropertySafe<DateTime>(fileIndex, ItemPropId.kpidCreationTime);
-                    DateTime lastWriteTime = this.GetPropertySafe<DateTime>(fileIndex, ItemPropId.kpidLastWriteTime);
-                    DateTime lastAccessTime = this.GetPropertySafe<DateTime>(fileIndex, ItemPropId.kpidLastAccessTime);
-                    uint crc = this.GetPropertySafe<uint>(fileIndex, ItemPropId.kpidCRC);
-                    uint attributes = this.GetPropertySafe<uint>(fileIndex, ItemPropId.kpidAttributes);
-                    string comment = this.GetPropertySafe<string>(fileIndex, ItemPropId.kpidComment);
-                    string hostOS = this.GetPropertySafe<string>(fileIndex, ItemPropId.kpidHostOS);
-                    string method = this.GetPropertySafe<string>(fileIndex, ItemPropId.kpidMethod);
-
-                    bool isSplitBefore = this.GetPropertySafe<bool>(fileIndex, ItemPropId.kpidSplitBefore);
-                    bool isSplitAfter = this.GetPropertySafe<bool>(fileIndex, ItemPropId.kpidSplitAfter);
-
-                    this.entries.Add(new Entry(this.archive, fileIndex)
-                    {
-                        FileName = fileName,
-                        IsFolder = isFolder,
-                        IsEncrypted = isEncrypted,
-                        Size = size,
-                        PackedSize = packedSize,
-                        CreationTime = creationTime,
-                        LastWriteTime = lastWriteTime,
-                        LastAccessTime = lastAccessTime,
-                        CRC = crc,
-                        Attributes = attributes,
-                        Comment = comment,
-                        HostOS = hostOS,
-                        Method = method,
-                        IsSplitBefore = isSplitBefore,
-                        IsSplitAfter = isSplitAfter
-                    });
-                }
-
-                return this.entries;
-            }
-        }
-
-        private T GetPropertySafe<T>(uint fileIndex, ItemPropId name)
-        {
-            try
-            {
-                return this.GetProperty<T>(fileIndex, name);
-            }
-            catch (InvalidCastException)
-            {
-                return default(T);
-            }
-        }
-
-        private T GetProperty<T>(uint fileIndex, ItemPropId name)
-        {
-            PropVariant propVariant = new PropVariant();
-            this.archive.GetProperty(fileIndex, name, ref propVariant);
-            object value = propVariant.GetObject();
-
-            if (propVariant.VarType == VarEnum.VT_EMPTY)
-            {
-                propVariant.Clear();
-                return default(T);
-            }
-
-            propVariant.Clear();
-
-            if (value == null)
-            {
-                return default(T);
-            }
-
-            Type type = typeof(T);
-            bool isNullable = type.IsGenericType && type.GetGenericTypeDefinition() == typeof(Nullable<>);
-            Type underlyingType = isNullable ? Nullable.GetUnderlyingType(type) : type;
-
-            // This is a hacky code just to work on Lex's machine
-			if (underlyingType == typeof(DateTime))
-			{
-				var dateTimeValue = (DateTime)value;
-				return (T)(object)dateTimeValue;
-			}
-
-			T result = (T)Convert.ChangeType(value.ToString(), underlyingType);
-
-            return result;
-        }
-
-        private void InitializeAndValidateLibrary()
-        {
-            if (string.IsNullOrWhiteSpace(this.libraryFilePath))
-            {
-                string currentArchitecture = IntPtr.Size == 4 ? "x86" : "x64"; // magic check
-
-                if (File.Exists(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "7z-" + currentArchitecture + ".dll")))
-                {
-                    this.libraryFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "7z-" + currentArchitecture + ".dll");
-                }
-                else if (File.Exists(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "bin", "7z-" + currentArchitecture + ".dll")))
-                {
-                    this.libraryFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "bin", "7z-" + currentArchitecture + ".dll");
-                }
-                else if (File.Exists(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "bin", currentArchitecture, "7z.dll")))
-                {
-                    this.libraryFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "bin", currentArchitecture, "7z.dll");
-                }
-                else if (File.Exists(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, currentArchitecture, "7z.dll")))
-                {
-                    this.libraryFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, currentArchitecture, "7z.dll");
-                }
-                else if (File.Exists(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "7-Zip", "7z.dll")))
-                {
-                    this.libraryFilePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "7-Zip", "7z.dll");
-                }
-            }
-
-            if (string.IsNullOrWhiteSpace(this.libraryFilePath))
-            {
-                throw new SevenZipException("libraryFilePath not set");
-            }
-
-            if (!File.Exists(this.libraryFilePath))
-            {
-                throw new SevenZipException("7z.dll not found");
-            }
-
-            try
-            {
-                this.sevenZipHandle = new SevenZipHandle(this.libraryFilePath);
-            }
-            catch (Exception e)
-            {
-                throw new SevenZipException("Unable to initialize SevenZipHandle", e);
-            }
-        }
-
-        private bool GuessFormatFromExtension(string fileExtension, out SevenZipFormat format)
-        {
-            if (string.IsNullOrWhiteSpace(fileExtension))
-            {
-                format = SevenZipFormat.Undefined;
-                return false;
-            }
-
-            fileExtension = fileExtension.TrimStart('.').Trim().ToLowerInvariant();
-
-            if (fileExtension.Equals("rar"))
-            {
-                // 7z has different GUID for Pre-RAR5 and RAR5, but they have both same extension (.rar)
-                // If it is [0x52 0x61 0x72 0x21 0x1A 0x07 0x01 0x00] then file is RAR5 otherwise RAR.
-                // https://www.rarlab.com/technote.htm
-
-                // We are unable to guess right format just by looking at extension and have to check signature
 
                 format = SevenZipFormat.Undefined;
                 return false;
             }
-
-            if (!Formats.ExtensionFormatMapping.ContainsKey(fileExtension))
+            finally
             {
-                format = SevenZipFormat.Undefined;
-                return false;
-            }
-
-            format = Formats.ExtensionFormatMapping[fileExtension];
-            return true;
-        }
-
-
-        private bool GuessFormatFromSignature(string filePath, out SevenZipFormat format)
-        {
-            using (FileStream fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
-            {
-                return GuessFormatFromSignature(fileStream, out format);
+                ArrayPool<byte>.Shared.Return(archiveFileSignature);
             }
         }
 
-        private bool GuessFormatFromSignature(Stream stream, out SevenZipFormat format)
-        {
-            int longestSignature = Formats.FileSignatures.Values.OrderByDescending(v => v.Length).First().Length;
-
-            byte[] archiveFileSignature = new byte[longestSignature];
-            int bytesRead = stream.Read(archiveFileSignature, 0, longestSignature);
-
-            stream.Position -= bytesRead; // go back o beginning
-
-            if (bytesRead != longestSignature)
-            {
-                format = SevenZipFormat.Undefined;
-                return false;
-            }
-
-            foreach (KeyValuePair<SevenZipFormat, byte[]> pair in Formats.FileSignatures)
-            {
-                if (archiveFileSignature.Take(pair.Value.Length).SequenceEqual(pair.Value))
-                {
-                    format = pair.Key;
-                    return true;
-                }
-            }
-
-            format = SevenZipFormat.Undefined;
-            return false;
-        }
-
-        ~ArchiveFile()
-        {
-            this.Dispose(false);
-        }
-
-        protected void Dispose(bool disposing)
-        {
-            if (this.archiveStream != null)
-            {
-                this.archiveStream.Dispose();
-            }
-
-            if (this.archive != null)
-            {
-                Marshal.ReleaseComObject(this.archive);
-            }
-
-            if (this.sevenZipHandle != null)
-            {
-                this.sevenZipHandle.Dispose();
-            }
-        }
-
+        /// <summary>
+        /// Releases all resources used by the <see cref="ArchiveFile"/> class.
+        /// </summary>
         public void Dispose()
         {
-            this.Dispose(true);
+            _archive?.Close();
+            if (_disposeArchiveStream)
+            {
+                _archiveStream.Dispose();
+            }
+
             GC.SuppressFinalize(this);
         }
     }
