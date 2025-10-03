@@ -1,9 +1,11 @@
 ﻿using System.Collections.Generic;
 using System.IO;
+using System.Runtime.InteropServices.Marshalling;
 
 namespace SevenZipExtractor
 {
-    internal class ArchiveStreamsCallback : IArchiveExtractCallback, ICryptoGetTextPassword
+    [GeneratedComClass]
+    internal partial class ArchiveStreamsCallback : IArchiveExtractCallback, ICryptoGetTextPassword
     {
         private readonly IList<Stream> streams;
 
@@ -24,7 +26,7 @@ namespace SevenZipExtractor
         {
         }
 
-        public void SetCompleted(ref ulong completeValue)
+        public void SetCompleted(in ulong completeValue)
         {
         }
 

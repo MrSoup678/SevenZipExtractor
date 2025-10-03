@@ -4,7 +4,7 @@ using System.IO;
 using System.Linq;
 
 
-namespace SevenZipExtractor.Tests
+namespace SevenZipExtractor.Tests.Xunit
 {
     public abstract class TestBase
     {

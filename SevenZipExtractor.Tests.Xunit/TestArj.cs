@@ -1,9 +1,8 @@
 ﻿using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using Xunit;
 
-namespace SevenZipExtractor.Tests
+namespace SevenZipExtractor.Tests.Xunit
 {
     
     public class TestArj : TestBase

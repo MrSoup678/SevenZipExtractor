@@ -1,6 +1,6 @@
-﻿using Xunit;
+﻿
 
-namespace SevenZipExtractor.Tests
+namespace SevenZipExtractor.Tests.Xunit
 {
     
     public class TestZip : TestBase

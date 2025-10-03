@@ -1,4 +1,4 @@
-﻿namespace SevenZipExtractor.Tests
+﻿namespace SevenZipExtractor.Tests.Xunit
 {
     public struct TestFileEntry
     {

@@ -14,6 +14,17 @@
             "cwd": "${workspaceFolder}/Example",
             "console": "internalConsole",
             "stopAtEntry": false
+        }, 
+        {
+            "name": "Run Tests",
+            "type": "coreclr",
+            "request": "launch",
+            "preLaunchTask": "build",
+            "program": "${workspaceFolder}/SevenZipExtractor.Tests.Xunit/bin/Debug/net9.0/SevenZipExtractor.Tests.Xunit.dll",
+            "args": [],
+            "cwd": "${workspaceFolder}/Example",
+            "console": "internalConsole",
+            "stopAtEntry": false
         },
         {
             "name": ".NET Core Attach",

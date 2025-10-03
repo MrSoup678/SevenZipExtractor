@@ -18,9 +18,15 @@ namespace Benchmark
         {
             public Config()
             {
+                /*
                 Add(MemoryDiagnoser.Default);
                 Add(Job.ShortRun.With(ClrRuntime.Net47));
                 Add(Job.ShortRun.With(CoreRuntime.Core31));
+                */
+                AddDiagnoser(MemoryDiagnoser.Default);
+                AddJob(Job.ShortRun.WithRuntime(ClrRuntime.Net47));
+                AddJob(Job.ShortRun.WithRuntime(CoreRuntime.Core31));
+                AddJob(Job.ShortRun.WithRuntime(CoreRuntime.Core90));
             }
         }
 

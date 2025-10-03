@@ -164,7 +164,7 @@ namespace SevenZipExtractor
                 }
 
                 ulong checkPos = 32 * 1024;
-                int open = this.archive.Open(this.archiveStream, ref checkPos, null);
+                int open = this.archive.Open(this.archiveStream, in checkPos, null);
 
                 if (open != 0)
                 {
@@ -234,7 +234,7 @@ namespace SevenZipExtractor
         {
             #if NET9_0_OR_GREATER
             ComVariant propVariant = new ComVariant();
-            this.archive.GetProperty(fileIndex,name,ref propVariant);
+            this.archive.GetProperty(fileIndex,name,out propVariant);
             object value = propVariant.As<object>();
 
             if (propVariant.VarType == VarEnum.VT_EMPTY)

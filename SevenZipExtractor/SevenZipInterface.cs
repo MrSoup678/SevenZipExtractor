@@ -7,6 +7,7 @@ using System.Runtime.InteropServices;
 using System.Runtime.InteropServices.Marshalling;
 using System.Security.Permissions;
 using System.Threading;
+using System.Windows.Markup;
 
 namespace SevenZipExtractor
 {
@@ -71,7 +72,7 @@ namespace SevenZipExtractor
                     break;
 
                 default:
-                    //-PropVariantClear(ref this);
+                    PropVariantClear(ref this);
                     break;
             }
         }
@@ -101,19 +102,17 @@ namespace SevenZipExtractor
         }
     }
 #endif
-    [ComImport]
+    [GeneratedComInterface(Options = ComInterfaceOptions.ManagedObjectWrapper)]
     [Guid("23170F69-40C1-278A-0000-000000050000")]
-    [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-    internal interface IProgress
+    internal partial interface IProgress
     {
         void SetTotal(ulong total);
-        void SetCompleted([In] ref ulong completeValue);
+        void SetCompleted(in ulong completeValue);
     }
 
-    [ComImport]
+    [GeneratedComInterface(Options = ComInterfaceOptions.ManagedObjectWrapper)]
     [Guid("23170F69-40C1-278A-0000-000600100000")]
-    [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-    internal interface IArchiveOpenCallback
+    internal partial interface IArchiveOpenCallback
     {
         // ref ulong replaced with IntPtr because handlers ofter pass null value
         // read actual value with Marshal.ReadInt64
@@ -126,10 +125,9 @@ namespace SevenZipExtractor
             IntPtr bytes); // [In] ref ulong bytes
     }
 
-    [ComImport]
+    [GeneratedComInterface(Options = ComInterfaceOptions.ManagedObjectWrapper)]
     [Guid("23170F69-40C1-278A-0000-000500100000")]
-    [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-    internal interface ICryptoGetTextPassword
+    internal partial interface ICryptoGetTextPassword
     {
         [PreserveSig]
         int CryptoGetTextPassword(
@@ -139,10 +137,9 @@ namespace SevenZipExtractor
         //string CryptoGetTextPassword();
     }
 
-    [ComImport]
+    [GeneratedComInterface(Options = ComInterfaceOptions.ManagedObjectWrapper)]
     [Guid("23170F69-40C1-278A-0000-000500110000")]
-    [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-    internal interface ICryptoGetTextPassword2
+    internal partial interface ICryptoGetTextPassword2
     {
         /// <summary>
         /// Sets password for the archive
@@ -171,10 +168,9 @@ namespace SevenZipExtractor
         kCRCError
     }
 
-    [ComImport]
+    [GeneratedComInterface(Options = ComInterfaceOptions.ManagedObjectWrapper)]
     [Guid("23170F69-40C1-278A-0000-000600300000")]
-    [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-    internal interface IArchiveOpenVolumeCallback
+    internal partial interface IArchiveOpenVolumeCallback
     {
         void GetProperty(
             ItemPropId propID, // PROPID
@@ -186,19 +182,17 @@ namespace SevenZipExtractor
             [MarshalAs(UnmanagedType.Interface)] out IInStream inStream);
     }
 
-    [ComImport]
+    [GeneratedComInterface(Options = ComInterfaceOptions.ManagedObjectWrapper)]
     [Guid("23170F69-40C1-278A-0000-000600400000")]
-    [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-    internal interface IInArchiveGetStream
+    internal partial interface IInArchiveGetStream
     {
         [return: MarshalAs(UnmanagedType.Interface)]
         ISequentialInStream GetStream(uint index);
     }
 
-    [ComImport]
+    [GeneratedComInterface(Options = ComInterfaceOptions.ManagedObjectWrapper)]
     [Guid("23170F69-40C1-278A-0000-000300010000")]
-    [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-    internal interface ISequentialInStream
+    internal partial interface ISequentialInStream
     {
         //[PreserveSig]
         //int Read(
@@ -220,10 +214,9 @@ namespace SevenZipExtractor
     */
     }
 
-    [ComImport]
+    [GeneratedComInterface(Options = ComInterfaceOptions.ManagedObjectWrapper)]
     [Guid("23170F69-40C1-278A-0000-000300020000")]
-    [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-    internal interface ISequentialOutStream
+    internal partial interface ISequentialOutStream
     {
         [PreserveSig]
         int Write(
@@ -237,10 +230,9 @@ namespace SevenZipExtractor
     */
     }
 
-    [ComImport]
+    [GeneratedComInterface(Options = ComInterfaceOptions.ManagedObjectWrapper)]
     [Guid("23170F69-40C1-278A-0000-000300030000")]
-    [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-    internal interface IInStream //: ISequentialInStream
+    internal partial interface IInStream //: ISequentialInStream
     {
         //[PreserveSig]
         //int Read(
@@ -259,10 +251,9 @@ namespace SevenZipExtractor
             IntPtr newPosition); // ref long newPosition
     }
 
-    [ComImport]
+    [GeneratedComInterface(Options = ComInterfaceOptions.ManagedObjectWrapper)]
     [Guid("23170F69-40C1-278A-0000-000300040000")]
-    [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-    internal interface IOutStream //: ISequentialOutStream
+    internal partial interface IOutStream //: ISequentialOutStream
     {
         [PreserveSig]
         int Write(
@@ -326,16 +317,15 @@ namespace SevenZipExtractor
     }
 
 
-    [ComImport]
+    [GeneratedComInterface(Options = ComInterfaceOptions.ManagedObjectWrapper)]
     [Guid("23170F69-40C1-278A-0000-000600600000")]
-    [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
     //[AutomationProxy(true)]
-    internal interface IInArchive
+    internal partial interface IInArchive
     {
         [PreserveSig]
         int Open(
             IInStream stream,
-            /*[MarshalAs(UnmanagedType.U8)]*/ [In] ref ulong maxCheckStartPosition,
+            /*[MarshalAs(UnmanagedType.U8)]*/ in ulong maxCheckStartPosition,
             [MarshalAs(UnmanagedType.Interface)] IArchiveOpenCallback openArchiveCallback);
 
         void Close();
@@ -343,10 +333,12 @@ namespace SevenZipExtractor
         uint GetNumberOfItems();
 
 #if NET9_0_OR_GREATER
+
+            
         void GetProperty(
             uint index,
             ItemPropId propID, // PROPID
-            ref ComVariant value); // PROPVARIANT
+            out ComVariant value); // PROPVARIANT
 #else
         void GetProperty(
             uint index,
@@ -367,7 +359,7 @@ namespace SevenZipExtractor
 #if NET9_0_OR_GREATER
          void GetArchiveProperty(
             uint propID, // PROPID
-            ref ComVariant value); // PROPVARIANT
+            out ComVariant value); // PROPVARIANT
 
 #else
          void GetArchiveProperty(
@@ -469,7 +461,9 @@ namespace SevenZipExtractor
         }
     }
 
-    internal class InStreamWrapper : StreamWrapper, ISequentialInStream, IInStream
+
+    [GeneratedComClass]
+    internal partial class InStreamWrapper : StreamWrapper, ISequentialInStream, IInStream
     {
         public InStreamWrapper(Stream baseStream) : base(baseStream)
         {
@@ -481,7 +475,8 @@ namespace SevenZipExtractor
         }
     }
 
-    internal class OutStreamWrapper : StreamWrapper, ISequentialOutStream, IOutStream
+    [GeneratedComClass]
+    internal partial class OutStreamWrapper : StreamWrapper, ISequentialOutStream, IOutStream
     {
         public OutStreamWrapper(Stream baseStream) : base(baseStream)
         {

@@ -1,9 +1,11 @@
 using System;
 using System.IO;
+using System.Runtime.InteropServices.Marshalling;
 
 namespace SevenZipExtractor
 {
-    internal class ArchiveFileCallback : IArchiveExtractCallback
+    [GeneratedComClass]
+    internal partial class ArchiveFileCallback : IArchiveExtractCallback
     {
         private readonly string fileName;
         private readonly uint fileNumber;
@@ -19,7 +21,7 @@ namespace SevenZipExtractor
         {
         }
 
-        public void SetCompleted(ref ulong completeValue)
+        public void SetCompleted(in ulong completeValue)
         {
         }
 
