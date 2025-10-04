@@ -115,9 +115,9 @@ namespace SevenZipExtractor.Unmanaged
         {
             Guid interfaceId = Constants.IID_IInArchive_Guid;
             Console.WriteLine($"[7-zip][NativeMethods::CreateInArchiveClassId] Creating IInArcive {interfaceId} with Format Class ID: {formatClassId}");
-
+            nint outObjectNative = 0;
             int result;
-            if ((result = CreateObjectDelegate(formatClassId, interfaceId, out nint outObjectNative)) != 0)
+            if ((result = CreateObjectDelegate(&formatClassId, &interfaceId, &outObjectNative)) != 0)
             {
                 Marshal.ThrowExceptionForHR(result);
             }
@@ -126,6 +126,6 @@ namespace SevenZipExtractor.Unmanaged
         }
 
         [LibraryImport(SevenZipPlaceHolderName, EntryPoint = "CreateObject")]
-        internal static unsafe partial int CreateObjectDelegate(Guid classIDNative, Guid interfaceIDNative, out nint outObjectNative);
+        internal static unsafe partial int CreateObjectDelegate(Guid* classIDNative, Guid* interfaceIDNative, nint* outObjectNative);
     }
 }
