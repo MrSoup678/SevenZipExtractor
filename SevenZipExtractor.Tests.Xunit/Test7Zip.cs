@@ -1,4 +1,4 @@
-﻿
+﻿using SevenZipExtractor.Enum;
 namespace SevenZipExtractor.Tests.Xunit
 {
     

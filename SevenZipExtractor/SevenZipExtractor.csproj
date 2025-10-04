@@ -28,10 +28,22 @@
 	</PropertyGroup>
 
 	<ItemGroup>
-	  <Content Include="Lib\7z.dll">
-	    <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-	  </Content>
+		<None Include="$(MSBuildThisFileDirectory)Lib\7z.dll">
+			<PackagePath>build\x64\</PackagePath>
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+
+			<Pack>true</Pack>
+			</None>
+			<None Include="$(MSBuildThisFileDirectory)Lib\7z.so">
+			<PackagePath>build\x64\</PackagePath>
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+
+			<Pack>true</Pack>
+			</None>
+			
 	</ItemGroup>
+
+
 	
 	<PropertyGroup Condition="'$(Configuration)'=='Release'">
 		<Optimize>True</Optimize>

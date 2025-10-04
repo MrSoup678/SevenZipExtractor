@@ -2,6 +2,7 @@
 using SevenZipExtractor.Interface;
 using SevenZipExtractor.IO.Callback;
 using System;
+using System.ComponentModel;
 using System.IO;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices.Marshalling;
@@ -219,9 +220,11 @@ namespace SevenZipExtractor
                 File.SetLastWriteTime(fileStream.Name, LastWriteTime);
             }
         }
+        /*
         public void Extract(Stream stream, string password = null)
         {
             this.archive.Extract(new[] { this.index }, 1, 0, new ArchiveStreamCallback(this.index, stream, password));
         }
+        */
     }
 }

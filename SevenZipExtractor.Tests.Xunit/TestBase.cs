@@ -1,8 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel.Design;
 using System.IO;
 using System.Linq;
-
+using SevenZipExtractor.Enum;
 
 namespace SevenZipExtractor.Tests.Xunit
 {
@@ -23,12 +24,16 @@ namespace SevenZipExtractor.Tests.Xunit
                 new TestFileEntry { Name = "testFolder/image3.jpg", IsFolder = false, MD5 = "24ffd227340432596fe61ef6300098ad"},
         };
 
-        protected void TestExtractToStream(byte[] archiveBytes, IList<TestFileEntry> expected, SevenZipFormat? sevenZipFormat = null, string password = null)
+        protected void TestExtractToStream(byte[] archiveBytes, IList<TestFileEntry> expected, SevenZipFormat sevenZipFormat = SevenZipFormat.Undefined, string? password = null)
         {
             MemoryStream memoryStream = new MemoryStream(archiveBytes);
 
             using (ArchiveFile archiveFile = new ArchiveFile(memoryStream, sevenZipFormat))
             {
+                if(password!=null)
+                {
+                    archiveFile.SetArchivePassword(password);
+                }
                 foreach (TestFileEntry testEntry in expected)
                 {
                     Entry? entry = archiveFile.Entries.FirstOrDefault(e => e.FileName == testEntry.Name && e.IsFolder == testEntry.IsFolder);
@@ -43,7 +48,7 @@ namespace SevenZipExtractor.Tests.Xunit
 
                     using (MemoryStream entryMemoryStream = new MemoryStream())
                     {
-                        entry.Extract(entryMemoryStream, password);
+                        entry.Extract(entryMemoryStream, true);
 
                         if (testEntry.MD5 != null)
                         {

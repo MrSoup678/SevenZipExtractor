@@ -1,4 +1,4 @@
-﻿
+﻿using SevenZipExtractor.Enum;
 namespace SevenZipExtractor.Tests.Xunit
 {
     public class TestLzh : TestBase
@@ -8,7 +8,7 @@ namespace SevenZipExtractor.Tests.Xunit
         [Fact]
         public void TestGuessAndExtractToStream_Fails()
         {
-            Assert.Throws<SevenZipException>(() =>
+            Assert.Throws<Exception>(() =>
             {
                 byte[] fileMem = File.ReadAllBytes("Resources/lzh.lzh");
                 this.TestExtractToStream(fileMem, this.TestEntriesWithoutFolder);

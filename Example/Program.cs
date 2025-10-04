@@ -26,7 +26,7 @@ namespace ConsoleApplication86
 
                     // extract to stream
                     MemoryStream memoryStream = new MemoryStream();
-                    entry.Extract(memoryStream);
+                    entry.Extract(memoryStream,true);
                 }
             }
 

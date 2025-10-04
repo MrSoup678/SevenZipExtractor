@@ -17,6 +17,7 @@ namespace SevenZipExtractor.IO.Callback
         CancellationToken cancellationToken
         ) : StreamCallbackBase, IDisposable
     {
+        
         public override void GetStream(uint index, out ISequentialOutStream? outStream, AskMode askExtractMode)
         {
             if (index != fileNumber || askExtractMode != AskMode.Extract)
