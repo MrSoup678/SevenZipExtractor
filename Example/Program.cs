@@ -9,13 +9,13 @@ namespace ConsoleApplication86
     {
         static void Main(string[] args)
         {
-            using (ArchiveFile archiveFile = new ArchiveFile(@"Archive.arj"))
+            using (ArchiveFile archiveFile = new ArchiveFile(@"7z.7z"))
             {
                 // extract all
                 archiveFile.Extract("Output");
             }
 
-            using (ArchiveFile archiveFile = new ArchiveFile("archive.arj"))
+            using (ArchiveFile archiveFile = new ArchiveFile("7z.7z"))
             {
                 foreach (Entry entry in archiveFile.Entries)
                 {

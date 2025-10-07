@@ -12,4 +12,10 @@
   <ItemGroup>
     <ProjectReference Include="..\SevenZipExtractor\SevenZipExtractor.csproj" />
   </ItemGroup>
+
+   <ItemGroup>
+    <Content Include="7z.7z">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>  
+  </ItemGroup>
 </Project>
