@@ -8,6 +8,7 @@ using System.Runtime.InteropServices.Marshalling;
 using System.Security.Permissions;
 using System.Threading;
 using System.Windows.Markup;
+using SevenZipExtractor.Interop;
 
 namespace SevenZipExtractor
 {
@@ -326,7 +327,7 @@ namespace SevenZipExtractor
         int Open(
             IInStream stream,
             /*[MarshalAs(UnmanagedType.U8)]*/ in ulong maxCheckStartPosition,
-            [MarshalAs(UnmanagedType.Interface)] IArchiveOpenCallback openArchiveCallback);
+            [MarshalAs(UnmanagedType.Interface)] IArchiveOpenCallback? openArchiveCallback);
 
         void Close();
         //void GetNumberOfItems([In] ref uint numItem);
@@ -338,7 +339,7 @@ namespace SevenZipExtractor
         void GetProperty(
             uint index,
             ItemPropId propID, // PROPID
-            out ComVariant value); // PROPVARIANT
+            out ComVariant7Zip value); // PROPVARIANT
 #else
         void GetProperty(
             uint index,
@@ -359,7 +360,7 @@ namespace SevenZipExtractor
 #if NET9_0_OR_GREATER
          void GetArchiveProperty(
             uint propID, // PROPID
-            out ComVariant value); // PROPVARIANT
+            out ComVariant7Zip value); // PROPVARIANT
 
 #else
          void GetArchiveProperty(
@@ -405,9 +406,9 @@ namespace SevenZipExtractor
          Guid* classID,
          Guid* interfaceID,
         //out IntPtr outObject);
-        [MarshalAs(UnmanagedType.Interface)] object* outObject);
+        [MarshalAs(UnmanagedType.Interface)] nint* outObject);
 
-    [UnmanagedFunctionPointer(CallingConvention.StdCall)]
+    [UnmanagedFunctionPointer(CallingConvention.Winapi)]
     #if NET9_0_OR_GREATER
     internal delegate int GetHandlerPropertyDelegate(
         ArchivePropId propID,
@@ -417,10 +418,10 @@ namespace SevenZipExtractor
         ArchivePropId propID,
         ref PropVariant value); // PROPVARIANT
     #endif
-    [UnmanagedFunctionPointer(CallingConvention.StdCall)]
+    [UnmanagedFunctionPointer(CallingConvention.Winapi)]
     internal unsafe delegate int GetNumberOfFormatsDelegate( uint* numFormats);
 
-    [UnmanagedFunctionPointer(CallingConvention.StdCall)]
+    [UnmanagedFunctionPointer(CallingConvention.Winapi)]
 #if NET9_0_OR_GREATER
     internal delegate int GetHandlerProperty2Delegate(
         uint formatIndex,

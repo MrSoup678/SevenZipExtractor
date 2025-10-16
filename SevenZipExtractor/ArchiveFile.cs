@@ -3,8 +3,8 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
-#if NET9_0_OR_GREATER
-using System.Runtime.InteropServices.Marshalling;
+#if NET8_0_OR_GREATER
+using SevenZipExtractor.Interop;
 #endif
 
 namespace SevenZipExtractor
@@ -14,15 +14,15 @@ namespace SevenZipExtractor
         private SevenZipHandle sevenZipHandle;
         private readonly IInArchive archive;
         private readonly InStreamWrapper archiveStream;
-        private IList<Entry> entries;
+        private IList<Entry>? entries;
 
         private string libraryFilePath;
 
         public SevenZipFormat Format { get; private set; }
 
-        public ArchiveFile(string archiveFilePath, string libraryFilePath = null)
+        public ArchiveFile(string archiveFilePath, string? libraryFilePath = null)
         {
-            this.libraryFilePath = libraryFilePath;
+            this.libraryFilePath = libraryFilePath!;
 
             this.InitializeAndValidateLibrary();
 
@@ -50,13 +50,13 @@ namespace SevenZipExtractor
 
             this.Format = format;
 
-            this.archive = this.sevenZipHandle.CreateInArchive(Formats.FormatGuidMapping[format]);
+            this.archive = this.sevenZipHandle!.CreateInArchive(Formats.FormatGuidMapping[format]);
             this.archiveStream = new InStreamWrapper(File.OpenRead(archiveFilePath));
         }
 
-        public ArchiveFile(Stream archiveStream, SevenZipFormat? format = null, string libraryFilePath = null)
+        public ArchiveFile(Stream archiveStream, SevenZipFormat? format = null, string? libraryFilePath = null)
         {
-            this.libraryFilePath = libraryFilePath;
+            this.libraryFilePath = libraryFilePath!;
 
             this.InitializeAndValidateLibrary();
 
@@ -81,7 +81,7 @@ namespace SevenZipExtractor
 
             this.Format = format.Value;
 
-            this.archive = this.sevenZipHandle.CreateInArchive(Formats.FormatGuidMapping[format.Value]);
+            this.archive = this.sevenZipHandle!.CreateInArchive(Formats.FormatGuidMapping[format.Value]);
             this.archiveStream = new InStreamWrapper(archiveStream);
         }
 
@@ -232,8 +232,8 @@ namespace SevenZipExtractor
 
         private T GetProperty<T>(uint fileIndex, ItemPropId name)
         {
-            #if NET9_0_OR_GREATER
-            ComVariant propVariant = new ComVariant();
+            #if NET8_0_OR_GREATER
+            ComVariant7Zip propVariant = new ComVariant7Zip();
             this.archive.GetProperty(fileIndex,name,out propVariant);
             object value = propVariant.As<object>();
 
@@ -303,7 +303,7 @@ namespace SevenZipExtractor
         {
             if (string.IsNullOrWhiteSpace(this.libraryFilePath))
             {
-                string currentArchitecture = IntPtr.Size == 4 ? "x86" : "x64"; // magic check
+                string currentArchitecture = RuntimeInformation.OSArchitecture.ToString().ToLowerInvariant(); // magic check
                 if(RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
                 {
                     if (File.Exists(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "7z-" + currentArchitecture + ".dll")))

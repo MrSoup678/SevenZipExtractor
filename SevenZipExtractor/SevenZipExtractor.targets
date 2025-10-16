@@ -5,10 +5,13 @@
   **               SevenZipExtractor Native Provider Interop Files            **
   ******************************************************************************
   -->
+
+  <!-- TODO: Refactor to runtimes/{rid}/native. See https://learn.microsoft.com/en-us/nuget/create-packages/native-files-in-net-packages -->
   <ItemGroup>
-    <NativeLibs Include="$(MSBuildThisFileDirectory)**\*.dll" />
-    <None Include="@(NativeLibs)">
-      <Link>%(RecursiveDir)%(FileName)%(Extension)</Link>
+    <NativeLibsWin Include="$(MSBuildThisFileDirectory)**\*.dll" />
+    <NativeLibsLin Include="$(MSBuildThisFileDirectory)**\*.so" />
+    <None Include="@(NativeLibsWin),@(NativeLibsLin)">
+      <Link>bin\%(RecursiveDir)%(FileName)%(Extension)</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>

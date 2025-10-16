@@ -16,6 +16,7 @@ namespace SevenZipExtractor.Tests.Xunit
                 new TestFileEntry { Name = "testFolderimage3.jpg", IsFolder = false, MD5 = "24ffd227340432596fe61ef6300098ad"},
                 new TestFileEntry { Name = "画像4.jpg", IsFolder = false, MD5 = "e6efee68e730ec3dba7adbcc6b221281"},
                 new TestFileEntry { Name = "zdjęcie5.jpg", IsFolder = false, MD5 = "63538f657330b1f348885f3d0a9bc88f"},
+                new TestFileEntry { Name = "🜀🜁🜂.png", IsFolder = false, MD5 = "9d8ea7f8559a02c72b3e5208a03cde74"},
         };
 
         protected IList<TestFileEntry> TestEntriesWithoutFolder = new List<TestFileEntry>()
@@ -25,6 +26,7 @@ namespace SevenZipExtractor.Tests.Xunit
                 new TestFileEntry { Name = "testFolder/image3.jpg", IsFolder = false, MD5 = "24ffd227340432596fe61ef6300098ad"},
                 new TestFileEntry { Name = "画像4.jpg", IsFolder = false, MD5 = "e6efee68e730ec3dba7adbcc6b221281"},
                 new TestFileEntry { Name = "zdjęcie5.jpg", IsFolder = false, MD5 = "63538f657330b1f348885f3d0a9bc88f"},
+                new TestFileEntry { Name = "🜀🜁🜂.png", IsFolder = false, MD5 = "9d8ea7f8559a02c72b3e5208a03cde74"},
         };
 
         protected void TestExtractToStream(byte[] archiveBytes, IList<TestFileEntry> expected, SevenZipFormat? sevenZipFormat = null, string password = null)
