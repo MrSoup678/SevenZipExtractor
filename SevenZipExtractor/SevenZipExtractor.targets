@@ -11,7 +11,7 @@
     <NativeLibsWin Include="$(MSBuildThisFileDirectory)**\*.dll" />
     <NativeLibsLin Include="$(MSBuildThisFileDirectory)**\*.so" />
     <None Include="@(NativeLibsWin),@(NativeLibsLin)">
-      <Link>bin\%(RecursiveDir)%(FileName)%(Extension)</Link>
+      <Link>bin/%(RecursiveDir)%(FileName)%(Extension)</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>

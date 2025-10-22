@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
+using System.Runtime.InteropServices.ComTypes;
 #if NET8_0_OR_GREATER
 using SevenZipExtractor.Interop;
 #endif
@@ -168,7 +169,15 @@ namespace SevenZipExtractor
 
                 if (open != 0)
                 {
-                    throw new SevenZipException("Unable to open archive");
+                    //check if we have an error.
+                    Exception? comException = Marshal.GetExceptionForHR(open);
+                    if (comException!=null)
+                    {
+                        throw new SevenZipException("Unable to open archive.",comException);
+                    } else
+                    {
+                        throw new SevenZipException("Unable to open archive");
+                    }
                 }
 
                 uint itemsCount = this.archive.GetNumberOfItems();
@@ -177,14 +186,18 @@ namespace SevenZipExtractor
 
                 for (uint fileIndex = 0; fileIndex < itemsCount; fileIndex++)
                 {
-                    string fileName = this.GetProperty<string>(fileIndex, ItemPropId.kpidPath);
+                    string fileName = this.GetProperty<string>(fileIndex, ItemPropId.kpidPath)!;
                     bool isFolder = this.GetProperty<bool>(fileIndex, ItemPropId.kpidIsFolder);
                     bool isEncrypted = this.GetProperty<bool>(fileIndex, ItemPropId.kpidEncrypted);
                     ulong size = this.GetProperty<ulong>(fileIndex, ItemPropId.kpidSize);
                     ulong packedSize = this.GetProperty<ulong>(fileIndex, ItemPropId.kpidPackedSize);
-                    DateTime creationTime = this.GetPropertySafe<DateTime>(fileIndex, ItemPropId.kpidCreationTime);
-                    DateTime lastWriteTime = this.GetPropertySafe<DateTime>(fileIndex, ItemPropId.kpidLastWriteTime);
-                    DateTime lastAccessTime = this.GetPropertySafe<DateTime>(fileIndex, ItemPropId.kpidLastAccessTime);
+                    FILETIME tmpFileTime;
+                    tmpFileTime = GetProperty<FILETIME>(fileIndex,ItemPropId.kpidCreationTime);
+                    DateTime creationTime = DateTime.FromFileTime((long)(uint)tmpFileTime.dwHighDateTime <<32 | (long)(uint)tmpFileTime.dwLowDateTime);
+                    tmpFileTime = GetProperty<FILETIME>(fileIndex,ItemPropId.kpidLastWriteTime);
+                    DateTime lastWriteTime = DateTime.FromFileTime((long)(uint)tmpFileTime.dwHighDateTime <<32 | (long)(uint)tmpFileTime.dwLowDateTime);
+                    tmpFileTime = GetProperty<FILETIME>(fileIndex,ItemPropId.kpidLastAccessTime);
+                    DateTime lastAccessTime = DateTime.FromFileTime((long)(uint)tmpFileTime.dwHighDateTime <<32 | (long)(uint)tmpFileTime.dwLowDateTime);
                     uint crc = this.GetPropertySafe<uint>(fileIndex, ItemPropId.kpidCRC);
                     uint attributes = this.GetPropertySafe<uint>(fileIndex, ItemPropId.kpidAttributes);
                     string comment = this.GetPropertySafe<string>(fileIndex, ItemPropId.kpidComment);
@@ -230,40 +243,24 @@ namespace SevenZipExtractor
             }
         }
 
-        private T GetProperty<T>(uint fileIndex, ItemPropId name)
+        private T? GetProperty<T>(uint fileIndex, ItemPropId name)
         {
-            #if NET8_0_OR_GREATER
+#if NET8_0_OR_GREATER
             ComVariant7Zip propVariant = new ComVariant7Zip();
-            this.archive.GetProperty(fileIndex,name,out propVariant);
-            object value = propVariant.As<object>();
-
-            if (propVariant.VarType == VarEnum.VT_EMPTY)
+            unsafe
             {
-                propVariant.Dispose();
-                return default(T);
+                this.archive.GetProperty(fileIndex,name,&propVariant);
             }
-
-            propVariant.Dispose();
-
-            if (value == null)
+            if (typeof(T) == typeof(FILETIME))
             {
-                return default(T);
+                var outFileTime = propVariant.GetRawDataRef<FILETIME>();
+                //We have to forcibly cast to object here.
+                return (T)(object)outFileTime;
             }
-
-            Type type = typeof(T);
-            bool isNullable = type.IsGenericType && type.GetGenericTypeDefinition() == typeof(Nullable<>);
-            Type underlyingType = isNullable ? Nullable.GetUnderlyingType(type) : type;
-
-            // This is a hacky code just to work on Lex's machine
-			if (underlyingType == typeof(DateTime))
-			{
-				var dateTimeValue = (DateTime)value;
-				return (T)(object)dateTimeValue;
-			}
-
-			T result = (T)Convert.ChangeType(value.ToString(), underlyingType);
-
-            return result;
+            else
+            {
+                return propVariant.As<T>();
+            }
             #else
             PropVariant propVariant = new PropVariant();
             this.archive.GetProperty(fileIndex, name, ref propVariant);

@@ -518,10 +518,10 @@ namespace SevenZipExtractor.Interop
                 }
                 if(RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
                 {
-                    return (T)(object)new BStrWrapper(Marshal.PtrToStringBSTR(_typeUnion._unionTypes._bstr));
+                    return (T)(object)Marshal.PtrToStringBSTR(_typeUnion._unionTypes._bstr);
                 } else
                 {
-                    return (T)(object)new BStrWrapper(BStrMarshaller7Zip.NativeToManaged(_typeUnion._unionTypes._bstr));
+                    return (T)(object)BStrMarshaller7Zip.NativeToManaged(_typeUnion._unionTypes._bstr);
                 }
             }
             else if (typeof(T) == typeof(ErrorWrapper))

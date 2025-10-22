@@ -15,13 +15,20 @@ namespace SevenZipExtractor.Interop
 
         unsafe static BStrMarshaller7Zip()
         {
-            //We need to calculate size of OLECHAR as defined in 7z.so.
-            //This is beacuse -fshort-wchar exists, as unlikely as it will be enabled.
-            IntPtr dummyBstrHandle = SevenZipHandle.thisHandle!.BSTR.AllocLen(0, 1);
-            uint stringSize = SevenZipHandle.thisHandle!.BSTR.Length(dummyBstrHandle);
-            uint byteSize = SevenZipHandle.thisHandle!.BSTR.ByteLength(dummyBstrHandle);
-            SevenZipHandle.thisHandle!.BSTR.Free(dummyBstrHandle);
-            sizeOfOLECHAR = (byte)(byteSize / stringSize);
+            if(RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            {
+                sizeOfOLECHAR = 2; //we shouldn't run this anyway.
+            } else
+            {
+                //We need to calculate size of OLECHAR as defined in 7z.so.
+                //This is beacuse -fshort-wchar exists, as unlikely as it will be enabled.
+                IntPtr dummyBstrHandle = SevenZipHandle.thisHandle!.BSTR.AllocLen(0, 1);
+                uint stringSize = SevenZipHandle.thisHandle!.BSTR.Length(dummyBstrHandle);
+                uint byteSize = SevenZipHandle.thisHandle!.BSTR.ByteLength(dummyBstrHandle);
+                SevenZipHandle.thisHandle!.BSTR.Free(dummyBstrHandle);
+                sizeOfOLECHAR = (byte)(byteSize / stringSize);
+            }
+            
         }
         internal static string NativeToManaged(IntPtr natBstr)
         {

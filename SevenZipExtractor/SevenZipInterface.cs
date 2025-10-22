@@ -103,16 +103,18 @@ namespace SevenZipExtractor
         }
     }
 #endif
-    [GeneratedComInterface(Options = ComInterfaceOptions.ManagedObjectWrapper)]
+    [GeneratedComInterface]
     [Guid("23170F69-40C1-278A-0000-000000050000")]
+    [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
     internal partial interface IProgress
     {
         void SetTotal(ulong total);
         void SetCompleted(in ulong completeValue);
     }
 
-    [GeneratedComInterface(Options = ComInterfaceOptions.ManagedObjectWrapper)]
+    [GeneratedComInterface]
     [Guid("23170F69-40C1-278A-0000-000600100000")]
+    [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
     internal unsafe partial interface IArchiveOpenCallback
     {
         // ref ulong replaced with IntPtr because handlers ofter pass null value
@@ -126,8 +128,9 @@ namespace SevenZipExtractor
             ulong* bytes); // [In] ref ulong bytes
     }
 
-    [GeneratedComInterface(Options = ComInterfaceOptions.ManagedObjectWrapper)]
+    [GeneratedComInterface]
     [Guid("23170F69-40C1-278A-0000-000500100000")]
+    [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
     internal partial interface ICryptoGetTextPassword
     {
         [PreserveSig]
@@ -138,8 +141,9 @@ namespace SevenZipExtractor
         //string CryptoGetTextPassword();
     }
 
-    [GeneratedComInterface(Options = ComInterfaceOptions.ManagedObjectWrapper)]
+    [GeneratedComInterface]
     [Guid("23170F69-40C1-278A-0000-000500110000")]
+    [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
     internal partial interface ICryptoGetTextPassword2
     {
         /// <summary>
@@ -169,8 +173,9 @@ namespace SevenZipExtractor
         kCRCError
     }
 
-    [GeneratedComInterface(Options = ComInterfaceOptions.ManagedObjectWrapper)]
+    [GeneratedComInterface]
     [Guid("23170F69-40C1-278A-0000-000600300000")]
+    [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
     internal partial interface IArchiveOpenVolumeCallback
     {
         void GetProperty(
@@ -183,16 +188,18 @@ namespace SevenZipExtractor
             [MarshalAs(UnmanagedType.Interface)] out IInStream inStream);
     }
 
-    [GeneratedComInterface(Options = ComInterfaceOptions.ManagedObjectWrapper)]
+    [GeneratedComInterface]
     [Guid("23170F69-40C1-278A-0000-000600400000")]
+    [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
     internal partial interface IInArchiveGetStream
     {
         [return: MarshalAs(UnmanagedType.Interface)]
         ISequentialInStream GetStream(uint index);
     }
 
-    [GeneratedComInterface(Options = ComInterfaceOptions.ManagedObjectWrapper)]
+    [GeneratedComInterface]
     [Guid("23170F69-40C1-278A-0000-000300010000")]
+    [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
     internal partial interface ISequentialInStream
     {
         //[PreserveSig]
@@ -215,8 +222,9 @@ namespace SevenZipExtractor
     */
     }
 
-    [GeneratedComInterface(Options = ComInterfaceOptions.ManagedObjectWrapper)]
+    [GeneratedComInterface]
     [Guid("23170F69-40C1-278A-0000-000300020000")]
+    [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
     internal partial interface ISequentialOutStream
     {
         [PreserveSig]
@@ -231,9 +239,10 @@ namespace SevenZipExtractor
     */
     }
 
-    [GeneratedComInterface(Options = ComInterfaceOptions.ManagedObjectWrapper)]
+    [GeneratedComInterface]
     [Guid("23170F69-40C1-278A-0000-000300030000")]
-    internal unsafe partial interface IInStream //: ISequentialInStream
+    [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    internal unsafe partial interface IInStream : ISequentialInStream
     {
         //[PreserveSig]
         //int Read(
@@ -241,32 +250,26 @@ namespace SevenZipExtractor
         //  uint size,
         //  IntPtr processedSize); // ref uint processedSize
 
-        uint Read(
-            [Out, MarshalAs(UnmanagedType.LPArray, SizeParamIndex = 1)] byte[] data,
-            uint size);
+        //uint Read(
+        //    [Out, MarshalAs(UnmanagedType.LPArray, SizeParamIndex = 1)] byte[] data,
+        //    uint size);
 
         //[PreserveSig]
-        void Seek(
-            long offset,
-            uint seekOrigin,
-            long* newPosition); // ref long newPosition
     }
 
-    [GeneratedComInterface(Options = ComInterfaceOptions.ManagedObjectWrapper)]
+    [GeneratedComInterface]
     [Guid("23170F69-40C1-278A-0000-000300040000")]
-    internal unsafe partial interface IOutStream //: ISequentialOutStream
+    [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    internal unsafe partial interface IOutStream : ISequentialOutStream
     {
-        [PreserveSig]
-        int Write(
-            [In, MarshalAs(UnmanagedType.LPArray, SizeParamIndex = 1)] byte[] data,
-            uint size,
-            IntPtr processedSize); // ref uint processedSize
+        //[PreserveSig]
+        //int Write(
+       //     [In, MarshalAs(UnmanagedType.LPArray, SizeParamIndex = 1)] byte[] data,
+       //     uint size,
+       //     IntPtr processedSize); // ref uint processedSize
 
         //[PreserveSig]
-        void Seek(
-            long offset,
-            uint seekOrigin,
-            long* newPosition); // ref long newPosition
+        
 
         [PreserveSig]
         int SetSize(long newSize);
@@ -318,28 +321,29 @@ namespace SevenZipExtractor
     }
 
 
-    [GeneratedComInterface(Options = ComInterfaceOptions.ManagedObjectWrapper)]
     [Guid("23170F69-40C1-278A-0000-000600600000")]
+    [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    [GeneratedComInterface]
     //[AutomationProxy(true)]
     internal partial interface IInArchive
     {
         [PreserveSig]
         int Open(
-            IInStream stream,
-            /*[MarshalAs(UnmanagedType.U8)]*/ in ulong maxCheckStartPosition,
+            IInStream                                                  stream,
+            in                                   ulong                 maxCheckStartPosition,
             [MarshalAs(UnmanagedType.Interface)] IArchiveOpenCallback? openArchiveCallback);
 
         void Close();
         //void GetNumberOfItems([In] ref uint numItem);
         uint GetNumberOfItems();
 
-#if NET9_0_OR_GREATER
+#if NET8_0_OR_GREATER
 
             
-        void GetProperty(
+        unsafe void GetProperty(
             uint index,
             ItemPropId propID, // PROPID
-            out ComVariant7Zip value); // PROPVARIANT
+            ComVariant7Zip* value); // PROPVARIANT
 #else
         void GetProperty(
             uint index,
@@ -357,10 +361,11 @@ namespace SevenZipExtractor
         // indices must be sorted 
         // numItems = 0xFFFFFFFF means all files
         // testMode != 0 means "test files operation"
-#if NET9_0_OR_GREATER
-         void GetArchiveProperty(
+#if NET8_0_OR_GREATER
+        // can't use "out ComVariant7Zip", as this requires disabling runtime marshaller.
+        unsafe void GetArchiveProperty(
             uint propID, // PROPID
-            out ComVariant7Zip value); // PROPVARIANT
+            ComVariant7Zip* value); // PROPVARIANT
 
 #else
          void GetArchiveProperty(
@@ -406,13 +411,13 @@ namespace SevenZipExtractor
          Guid* classID,
          Guid* interfaceID,
         //out IntPtr outObject);
-        [MarshalAs(UnmanagedType.Interface)] nint* outObject);
+         nint* outObject);
 
     [UnmanagedFunctionPointer(CallingConvention.Winapi)]
-    #if NET9_0_OR_GREATER
-    internal delegate int GetHandlerPropertyDelegate(
+    #if NET8_0_OR_GREATER
+    internal unsafe delegate int GetHandlerPropertyDelegate(
         ArchivePropId propID,
-        ComVariant value); // PROPVARIANT
+        ComVariant7Zip* value); // PROPVARIANT
     #else
     internal delegate int GetHandlerPropertyDelegate(
         ArchivePropId propID,
@@ -422,11 +427,11 @@ namespace SevenZipExtractor
     internal unsafe delegate int GetNumberOfFormatsDelegate( uint* numFormats);
 
     [UnmanagedFunctionPointer(CallingConvention.Winapi)]
-#if NET9_0_OR_GREATER
-    internal delegate int GetHandlerProperty2Delegate(
+#if NET8_0_OR_GREATER
+    internal unsafe delegate int GetHandlerProperty2Delegate(
         uint formatIndex,
         ArchivePropId propID,
-        ref ComVariant value); // PROPVARIANT
+        ComVariant7Zip* value); // PROPVARIANT
     #else
     internal delegate int GetHandlerProperty2Delegate(
         uint formatIndex,
@@ -434,8 +439,7 @@ namespace SevenZipExtractor
         ref PropVariant value); // PROPVARIANT
         #endif
         
-        #if NET9_0_OR_GREATER
-        #endif
+        
 
     internal class StreamWrapper : IDisposable
     {
@@ -474,14 +478,6 @@ namespace SevenZipExtractor
         {
             return (uint) this.BaseStream.Read(data, 0, (int) size);
         }
-        public virtual void Seek(long offset, uint seekOrigin, long* newPosition)
-        {
-            long pos = BaseStream.Seek(offset, (SeekOrigin)seekOrigin);
-            if (newPosition != null)
-            {
-                *newPosition = pos;
-            }
-        }
     }
 
     [GeneratedComClass]
@@ -507,14 +503,6 @@ namespace SevenZipExtractor
             }
 
             return 0;
-        }
-        public virtual void Seek(long offset, uint seekOrigin, long* newPosition)
-        {
-            long pos = BaseStream.Seek(offset, (SeekOrigin)seekOrigin);
-            if (newPosition != null)
-            {
-                *newPosition = pos;
-            }
         }
     }
 }

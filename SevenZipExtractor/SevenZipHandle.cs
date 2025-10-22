@@ -182,17 +182,17 @@ namespace SevenZipExtractor
         */
         
         [UnmanagedFunctionPointer(CallingConvention.Winapi)]
-        public delegate IntPtr SysAllocBStringByteLenDelegate(IntPtr psz,uint len);
+        internal delegate IntPtr SysAllocBStringByteLenDelegate(IntPtr psz,uint len);
         [UnmanagedFunctionPointer(CallingConvention.Winapi)]
-        public delegate IntPtr SysAllocBStringLenDelegate(IntPtr sz,uint len);
+        internal delegate IntPtr SysAllocBStringLenDelegate(IntPtr sz,uint len);
         [UnmanagedFunctionPointer(CallingConvention.Winapi)]
-        public delegate IntPtr SysAllocBStringDelegate(IntPtr sz);
+        internal delegate IntPtr SysAllocBStringDelegate(IntPtr sz);
         [UnmanagedFunctionPointer(CallingConvention.Winapi)]
-        public delegate void SysFreeBStringDelegate(IntPtr bstr);
+        internal delegate void SysFreeBStringDelegate(IntPtr bstr);
         [UnmanagedFunctionPointer(CallingConvention.Winapi)]
-        public delegate uint SysBStringByteLenDelegate(IntPtr bstr);
+        internal delegate uint SysBStringByteLenDelegate(IntPtr bstr);
         [UnmanagedFunctionPointer(CallingConvention.Winapi)]
-        public delegate uint SysBStringLenDelegate(IntPtr bstr);
+        internal delegate uint SysBStringLenDelegate(IntPtr bstr);
     }
     
 
